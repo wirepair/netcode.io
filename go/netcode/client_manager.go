@@ -6,20 +6,6 @@ import (
 	"net"
 )
 
-type connectTokenEntry struct {
-	mac     []byte
-	address *net.UDPAddr
-	time    float64
-}
-
-type encryptionEntry struct {
-	expireTime float64
-	lastAccess float64
-	address    *net.UDPAddr
-	sendKey    []byte
-	recvKey    []byte
-}
-
 type ClientManager struct {
 	maxClients int
 	maxEntries int
