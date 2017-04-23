@@ -1,9 +1,9 @@
 package netcode
 
 import (
+	"bytes"
 	"errors"
 	"net"
-	"strings"
 	"time"
 )
 
@@ -33,6 +33,7 @@ type ConnectToken struct {
 func NewConnectToken() *ConnectToken {
 	token := &ConnectToken{}
 	token.PrivateData = &ConnectTokenPrivate{}
+	token.VersionInfo = make([]byte, VERSION_INFO_BYTES)
 	return token
 }
 
@@ -68,51 +69,49 @@ func (token *ConnectToken) Generate(clientId uint64, serverAddrs []net.UDPAddr, 
 
 // Writes the ConnectToken and previously encrypted ConnectTokenPrivate data to a byte slice
 func (token *ConnectToken) Write() ([]byte, error) {
-	buffer := NewBuffer(CONNECT_TOKEN_BYTES)
-	buffer.WriteBytes(token.VersionInfo)
-	buffer.WriteUint64(token.ProtocolId)
-	buffer.WriteUint64(token.CreateTimestamp)
-	buffer.WriteUint64(token.ExpireTimestamp)
-	buffer.WriteUint64(token.Sequence)
+	buffer := make([]byte, CONNECT_TOKEN_BYTES)
+	buffer, _ = WriteBytes(buffer, token.VersionInfo)
+	buffer, _ = WriteUint64(buffer, token.ProtocolId)
+	buffer, _ = WriteUint64(buffer, token.CreateTimestamp)
+	buffer, _ = WriteUint64(buffer, token.ExpireTimestamp)
+	buffer, _ = WriteUint64(buffer, token.Sequence)
 
 	// assumes private token has already been encrypted
-	buffer.WriteBytes(token.PrivateData.Buffer())
+	buffer, _ = WriteBytes(buffer, token.PrivateData.TokenData)
 
 	// writes server/client key and addresses to public part of the buffer
 	if err := token.WriteShared(buffer); err != nil {
 		return nil, err
 	}
 
-	buffer.WriteUint32(token.TimeoutSeconds)
-	return buffer.Buf, nil
+	buffer, _ = WriteUint32(buffer, token.TimeoutSeconds)
+	return buffer, nil
 }
 
 // Takes in a slice of decrypted connect token bytes and generates a new ConnectToken.
 // Note that the ConnectTokenPrivate is still encrypted at this point.
 func ReadConnectToken(tokenBuffer []byte) (*ConnectToken, error) {
 	var err error
-	var privateData []byte
 
-	buffer := NewBufferFromBytes(tokenBuffer)
 	token := NewConnectToken()
 
-	if token.VersionInfo, err = buffer.GetBytes(VERSION_INFO_BYTES); err != nil {
+	if tokenBuffer, err = ReadBytes(tokenBuffer, &token.VersionInfo, VERSION_INFO_BYTES); err != nil {
 		return nil, errors.New("read connect token data has bad version info " + err.Error())
 	}
 
-	if strings.Compare(VERSION_INFO, string(token.VersionInfo)) != 0 {
+	if !bytes.Equal(VERSION_INFO, token.VersionInfo) {
 		return nil, errors.New("read connect token data has bad version info: " + string(token.VersionInfo))
 	}
 
-	if token.ProtocolId, err = buffer.GetUint64(); err != nil {
+	if tokenBuffer, err = ReadUint64(tokenBuffer, &token.ProtocolId); err != nil {
 		return nil, errors.New("read connect token data has bad protocol id " + err.Error())
 	}
 
-	if token.CreateTimestamp, err = buffer.GetUint64(); err != nil {
+	if tokenBuffer, err = ReadUint64(tokenBuffer, &token.CreateTimestamp); err != nil {
 		return nil, errors.New("read connect token data has bad create timestamp " + err.Error())
 	}
 
-	if token.ExpireTimestamp, err = buffer.GetUint64(); err != nil {
+	if tokenBuffer, err = ReadUint64(tokenBuffer, &token.ExpireTimestamp); err != nil {
 		return nil, errors.New("read connect token data has bad expire timestamp " + err.Error())
 	}
 
@@ -120,23 +119,21 @@ func ReadConnectToken(tokenBuffer []byte) (*ConnectToken, error) {
 		return nil, errors.New("expire timestamp is > create timestamp")
 	}
 
-	if token.Sequence, err = buffer.GetUint64(); err != nil {
+	if tokenBuffer, err = ReadUint64(tokenBuffer, &token.Sequence); err != nil {
 		return nil, errors.New("read connect data has bad sequence " + err.Error())
 	}
 
-	if privateData, err = buffer.GetBytes(CONNECT_TOKEN_PRIVATE_BYTES); err != nil {
+	// it is still encrypted at this point.
+	if tokenBuffer, err = ReadBytes(tokenBuffer, &token.PrivateData.TokenData, len(token.PrivateData.TokenData)); err != nil {
 		return nil, errors.New("read connect data has bad private data " + err.Error())
 	}
 
-	// it is still encrypted at this point.
-	token.PrivateData.TokenData = NewBufferFromBytes(privateData)
-
 	// reads servers, client and server key
-	if err = token.ReadShared(buffer); err != nil {
+	if err = token.ReadShared(tokenBuffer); err != nil {
 		return nil, err
 	}
 
-	if token.TimeoutSeconds, err = buffer.GetUint32(); err != nil {
+	if tokenBuffer, err = ReadUint32(tokenBuffer, &token.TimeoutSeconds); err != nil {
 		return nil, err
 	}
 

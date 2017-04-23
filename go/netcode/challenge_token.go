@@ -1,5 +1,9 @@
 package netcode
 
+import (
+	"errors"
+)
+
 // Challenge tokens are used in certain packet types
 type ChallengeToken struct {
 	ClientId  uint64 // the clientId associated with this token
@@ -20,8 +24,8 @@ func NewChallengeToken(clientId uint64) *ChallengeToken {
 func (t *ChallengeToken) Write(userData []byte) []byte {
 	copy(t.UserData, userData)
 	ref := t.TokenData
-	t.TokenData = WriteUint64(t.TokenData, t.ClientId)
-	t.TokenData = WriteBytes(t.TokenData, userData)
+	t.TokenData, _ = WriteUint64(t.TokenData, t.ClientId)
+	t.TokenData, _ = WriteBytes(t.TokenData, userData)
 	return ref
 }
 
@@ -43,10 +47,17 @@ func DecryptChallengeToken(tokenBuffer []byte, sequence uint64, key []byte) ([]b
 // Generates a new ChallengeToken from the provided buffer byte slice. Only sets the ClientId
 // and UserData buffer.
 func ReadChallengeToken(buffer []byte) (*ChallengeToken, error) {
+	var err error
 	var clientId uint64
+
 	tokenBuffer := buffer
-	tokenBuffer = ReadUint64(tokenBuffer, &clientId)
+	if tokenBuffer, err = ReadUint64(tokenBuffer, &clientId); err != nil {
+		return nil, errors.New("error reading clientId: " + err.Error())
+	}
+
 	token := NewChallengeToken(clientId)
-	ReadBytes(tokenBuffer, &token.UserData, USER_DATA_BYTES)
+	if _, err = ReadBytes(tokenBuffer, &token.UserData, USER_DATA_BYTES); err != nil {
+		return nil, errors.New("error reading user data: " + err.Error())
+	}
 	return token, nil
 }

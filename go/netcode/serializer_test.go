@@ -10,10 +10,10 @@ func TestReadUint8(t *testing.T) {
 	bufRef := buf
 
 	val := uint8(0x1e)
-	buf = WriteUint8(buf, val)
+	buf, _ = WriteUint8(buf, val)
 
 	var out uint8
-	bufRef = ReadUint8(bufRef, &out)
+	bufRef, _ = ReadUint8(bufRef, &out)
 	if out != val {
 		t.Fatalf("error values did not match: %d != %d\n", out, val)
 	}
@@ -24,10 +24,10 @@ func TestReadUint16(t *testing.T) {
 	bufRef := buf
 
 	val := uint16(0x1eff)
-	buf = WriteUint16(buf, val)
+	buf, _ = WriteUint16(buf, val)
 
 	var out uint16
-	bufRef = ReadUint16(bufRef, &out)
+	bufRef, _ = ReadUint16(bufRef, &out)
 	if out != val {
 		t.Fatalf("error values did not match: %d != %d\n", out, val)
 	}
@@ -38,10 +38,10 @@ func TestReadUint32(t *testing.T) {
 	bufRef := buf
 
 	val := uint32(0x1e1e1e1e)
-	buf = WriteUint32(buf, val)
+	buf, _ = WriteUint32(buf, val)
 
 	var out uint32
-	bufRef = ReadUint32(bufRef, &out)
+	bufRef, _ = ReadUint32(bufRef, &out)
 	if out != val {
 		t.Fatalf("error values did not match: %d != %d\n", out, val)
 	}
@@ -52,10 +52,10 @@ func TestReadUint64(t *testing.T) {
 	bufRef := buf
 
 	val := uint64(0x1e1e1e1efefefefe)
-	buf = WriteUint64(buf, val)
+	buf, _ = WriteUint64(buf, val)
 
 	var out uint64
-	bufRef = ReadUint64(bufRef, &out)
+	bufRef, _ = ReadUint64(bufRef, &out)
 	if out != val {
 		t.Fatalf("error values did not match: %d != %d\n", out, val)
 	}
@@ -67,7 +67,7 @@ func TestReadByte(t *testing.T) {
 	bufRef := buf
 
 	var out byte
-	buf = ReadByte(buf, &out)
+	buf, _ = ReadByte(buf, &out)
 	if bufRef[0] != out {
 		t.Fatalf("bytes did not match: %v %v\n", bufRef, out)
 	}
@@ -85,7 +85,7 @@ func TestReadBytes(t *testing.T) {
 
 	out := make([]byte, 10)
 
-	buf = ReadBytes(buf, &out, 10)
+	buf, _ = ReadBytes(buf, &out, 10)
 	if !bytes.Equal(bufRef, out) {
 		t.Fatalf("bytes did not match: %v %v\n", bufRef, out)
 	}
@@ -100,11 +100,11 @@ func TestWriteBytesN(t *testing.T) {
 	bufRef := buf
 	bufRef2 := buf
 
-	buf = WriteBytesN(buf, []byte("abc"), 3)
+	buf, _ = WriteBytesN(buf, []byte("abc"), 3)
 
 	out := make([]byte, 10)
 
-	buf = ReadBytes(bufRef, &out, 3)
+	buf, _ = ReadBytes(bufRef, &out, 3)
 	if !bytes.Equal(bufRef2[:3], out) {
 		t.Fatalf("bytes did not match: %v %v\n", bufRef, out)
 	}

@@ -33,9 +33,6 @@ func TestNewChallengeToken(t *testing.T) {
 	}
 
 	decryptedCopy := make([]byte, len(decryptedBuffer))
-	copy(decryptedCopy, decryptedBuffer)
-	//var origClientId uint64
-	//decryptedCopy = ReadUint64(decryptedCopy, &origClientId)
 
 	newToken, err := ReadChallengeToken(decryptedBuffer)
 	if err != nil {
