@@ -8,6 +8,7 @@ import (
 func TestNewChallengeToken(t *testing.T) {
 	var err error
 	var userData []byte
+
 	var decryptedBuffer []byte
 
 	token := NewChallengeToken(TEST_CLIENT_ID)
@@ -31,6 +32,11 @@ func TestNewChallengeToken(t *testing.T) {
 		t.Fatalf("error decrypting challenge token: %s\n", err)
 	}
 
+	decryptedCopy := make([]byte, len(decryptedBuffer))
+	copy(decryptedCopy, decryptedBuffer)
+	//var origClientId uint64
+	//decryptedCopy = ReadUint64(decryptedCopy, &origClientId)
+
 	newToken, err := ReadChallengeToken(decryptedBuffer)
 	if err != nil {
 		t.Fatalf("error reading token data %s\n", err)
@@ -40,7 +46,7 @@ func TestNewChallengeToken(t *testing.T) {
 		t.Fatalf("token client id did not match, expected %d got %d\n", token.ClientId, newToken.ClientId)
 	}
 
-	if !bytes.Equal(newToken.UserData.Buf, token.UserData.Buf) {
-		t.Fatalf("user data did not match expected\n %#v\ngot\n%#v!", token.UserData.Buf, newToken.UserData.Buf)
+	if !bytes.Equal(newToken.UserData, userData) {
+		t.Fatalf("user data did not match expected\n%#v\ngot\n%#v!", newToken.UserData, token.UserData)
 	}
 }

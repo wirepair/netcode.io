@@ -400,7 +400,7 @@ func (s *Server) connectClient(clientIndex, encryptionIndex int, challengeToken 
 	client.address = addr
 	client.lastSendTime = s.serverTime
 	client.lastRecvTime = s.serverTime
-	copy(client.userData, challengeToken.UserData.Bytes())
+	copy(client.userData, challengeToken.UserData)
 	log.Printf("server accepted client %d from %s in slot: %d\n", client.clientId, addr.String(), clientIndex)
 	s.sendKeepAlive(client, clientIndex)
 }

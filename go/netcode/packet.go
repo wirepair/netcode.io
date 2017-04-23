@@ -504,7 +504,7 @@ func decryptPacket(packetBuffer *Buffer, packetLen int, protocolId, currentTimes
 		return 0, nil, errors.New("ignored encrypted packet. failed to decrypt: " + err.Error())
 	}
 
-	return packetSequence, NewBufferFromBytes(decryptedBuff), nil
+	return packetSequence, NewBufferByteRef(decryptedBuff), nil
 }
 
 // Reads and verifies the sequence id

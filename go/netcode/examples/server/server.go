@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	//"github.com/pkg/profile"
+	"github.com/pkg/profile"
 	"github.com/wirepair/netcode.io/go/netcode"
 	"log"
 	"net"
@@ -21,6 +21,7 @@ var serverAddr string
 var numServers int
 var startingPort int
 var maxClients int
+var runProfiler bool
 
 var clientId uint64
 var serverAddrs []net.UDPAddr
@@ -45,6 +46,7 @@ var serverKey = []byte{0x60, 0x6a, 0xbe, 0x6e, 0xc9, 0x19, 0x10, 0xea,
 func init() {
 	flag.StringVar(&webServerAddr, "webaddr", ":8880", "the web server token supplier address to bind to")
 	flag.IntVar(&numServers, "numservers", 3, "number of servers to start on successive ports")
+	flag.BoolVar(&runProfiler, "prof", false, "profile")
 	flag.IntVar(&startingPort, "port", 40000, "starting port number, increments by 1 for number of servers")
 	flag.IntVar(&maxClients, "maxclients", 256, "number of clients per server")
 }
@@ -63,8 +65,10 @@ func main() {
 		serverAddrs[i] = addr
 	}
 
-	//p := profile.Start(profile.TraceProfile, profile.ProfilePath("."), profile.NoShutdownHook)
-	//defer p.Stop()
+	if runProfiler {
+		p := profile.Start(profile.MemProfile, profile.ProfilePath("."), profile.NoShutdownHook)
+		defer p.Stop()
+	}
 
 	// start our netcode servers
 	for i := 0; i < numServers; i += 1 {

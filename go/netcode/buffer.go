@@ -28,6 +28,12 @@ func NewBufferFromBytes(buf []byte) *Buffer {
 	return b
 }
 
+func NewBufferByteRef(buf []byte) *Buffer {
+	b := &Buffer{}
+	b.Buf = buf
+	return b
+}
+
 // Returns a copy of Buffer
 func (b *Buffer) Copy() *Buffer {
 	c := NewBuffer(len(b.Buf))
