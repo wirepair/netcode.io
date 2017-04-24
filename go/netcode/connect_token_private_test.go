@@ -30,6 +30,8 @@ func TestConnectTokenPrivate(t *testing.T) {
 		t.Fatalf("error writing token private data")
 	}
 
+	originalTokenData := make([]byte, len(token1.TokenData))
+	copy(originalTokenData, token1.TokenData)
 	if err := token1.Encrypt(TEST_PROTOCOL_ID, expireTimestamp, TEST_SEQUENCE_START, TEST_PRIVATE_KEY); err != nil {
 		t.Fatalf("error encrypting token: %s\n", err)
 	}
@@ -40,28 +42,15 @@ func TestConnectTokenPrivate(t *testing.T) {
 		t.Fatalf("error decrypting token: %s", err)
 	}
 
+	if !bytes.Equal(originalTokenData, token2.TokenData) {
+		t.Fatalf("error decrypted token data did not match original token data: %#v\n%#v\n", originalTokenData, token2.TokenData)
+	}
+
 	if err := token2.Read(); err != nil {
 		t.Fatalf("error reading token: %s\n", err)
 	}
 
 	testComparePrivateTokens(token1, token2, t)
-
-	token2.TokenData.Reset()
-	if _, err = token2.Write(); err != nil {
-		t.Fatalf("error writing token2 buffer")
-	}
-
-	if err := token2.Encrypt(TEST_PROTOCOL_ID, expireTimestamp, TEST_SEQUENCE_START, TEST_PRIVATE_KEY); err != nil {
-		t.Fatalf("error encrypting second token: %s\n", err)
-	}
-
-	if len(token1.TokenData) != len(token2.TokenData) {
-		t.Fatalf("encrypted buffer lengths did not match %d and %d\n", len(token1.Buffer()), len(token2.Buffer()))
-	}
-
-	if !bytes.Equal(token1.TokenData, token2.TokenData) {
-		t.Fatalf("encrypted private bits didn't match\n%#v\n and\n%#v\n", token1.Buffer(), token2.Buffer())
-	}
 }
 
 func testComparePrivateTokens(token1, token2 *ConnectTokenPrivate, t *testing.T) {

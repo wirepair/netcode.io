@@ -32,7 +32,7 @@ func TestNewChallengeToken(t *testing.T) {
 		t.Fatalf("error decrypting challenge token: %s\n", err)
 	}
 
-	decryptedCopy := make([]byte, len(decryptedBuffer))
+	//decryptedCopy := make([]byte, len(decryptedBuffer))
 
 	newToken, err := ReadChallengeToken(decryptedBuffer)
 	if err != nil {

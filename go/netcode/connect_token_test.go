@@ -14,7 +14,7 @@ func TestConnectToken(t *testing.T) {
 	server := net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 40000}
 	servers := make([]net.UDPAddr, 1)
 	servers[0] = server
-	t.Logf("ip: %#v\n", server.IP)
+
 	if key, err = GenerateKey(); err != nil {
 		t.Fatalf("error generating key %s\n", key)
 	}
@@ -25,13 +25,14 @@ func TestConnectToken(t *testing.T) {
 	if tokenBuffer, err = inToken.Write(); err != nil {
 		t.Fatalf("error writing token: %s\n", err)
 	}
-
-	outToken, err := ReadConnectToken(tokenBuffer)
+	intokenCopy := make([]byte, len(tokenBuffer))
+	copy(intokenCopy, tokenBuffer)
+	outToken, err := ReadConnectToken(intokenCopy)
 	if err != nil {
 		t.Fatalf("error re-reading back token buffer: %s\n", err)
 	}
 
-	if string(inToken.VersionInfo) != string(outToken.VersionInfo) {
+	if !bytes.Equal(inToken.VersionInfo, outToken.VersionInfo) {
 		t.Fatalf("version info did not match expected: %s got: %s\n", inToken.VersionInfo, outToken.VersionInfo)
 	}
 
@@ -53,8 +54,8 @@ func TestConnectToken(t *testing.T) {
 
 	testCompareTokens(inToken, outToken, t)
 
-	if bytes.Compare(inToken.PrivateData.Buffer(), outToken.PrivateData.Buffer()) != 0 {
-		t.Fatalf("encrypted private data of tokens did not match\n%#v\n%#v", inToken.PrivateData.Buffer(), outToken.PrivateData.Buffer())
+	if bytes.Compare(inToken.PrivateData.TokenData, outToken.PrivateData.TokenData) != 0 {
+		t.Fatalf("encrypted private data of tokens did not match\n%#v\n%#v", inToken.PrivateData.TokenData, outToken.PrivateData.TokenData)
 	}
 
 	// need to decrypt the private tokens before we can compare

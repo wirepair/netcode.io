@@ -17,6 +17,7 @@ type ClientInstance struct {
 	sequence         uint64
 	lastSendTime     float64
 	lastRecvTime     float64
+	packetBuffer     []byte
 	userData         []byte
 	protocolId       uint64
 	replayProtection *ReplayProtection
@@ -26,6 +27,7 @@ type ClientInstance struct {
 
 func NewClientInstance() *ClientInstance {
 	c := &ClientInstance{}
+	c.packetBuffer = make([]byte, MAX_PACKET_BYTES)
 	c.userData = make([]byte, USER_DATA_BYTES)
 	c.packetQueue = NewPacketQueue(PACKET_QUEUE_SIZE)
 	c.replayProtection = NewReplayProtection()
@@ -51,13 +53,11 @@ func (c *ClientInstance) SendPacket(packet Packet, writePacketKey []byte, server
 	var bytesWritten int
 	var err error
 
-	packetBuffer := NewBuffer(MAX_PACKET_BYTES)
-
-	if bytesWritten, err = packet.Write(packetBuffer, c.protocolId, c.sequence, writePacketKey); err != nil {
+	if bytesWritten, err = packet.Write(c.packetBuffer, c.protocolId, c.sequence, writePacketKey); err != nil {
 		return errors.New("error: unable to write packet: " + err.Error())
 	}
 
-	if _, err := c.serverConn.WriteTo(packetBuffer.Buf[:bytesWritten], c.address); err != nil {
+	if _, err := c.serverConn.WriteTo(c.packetBuffer[:bytesWritten], c.address); err != nil {
 		log.Printf("error writing to client: %s\n", err)
 	}
 

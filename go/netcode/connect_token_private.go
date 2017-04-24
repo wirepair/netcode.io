@@ -2,6 +2,7 @@ package netcode
 
 import (
 	"errors"
+	//"log"
 	"net"
 )
 
@@ -17,10 +18,17 @@ type ConnectTokenPrivate struct {
 // Create a new connect token private with an empty TokenData buffer
 func NewConnectTokenPrivate(clientId uint64, serverAddrs []net.UDPAddr, userData []byte) *ConnectTokenPrivate {
 	p := &ConnectTokenPrivate{}
-	p.TokenData = make([]byte, CONNECT_TOKEN_PRIVATE_BYTES-MAC_BYTES)
+	p.TokenData = make([]byte, CONNECT_TOKEN_PRIVATE_BYTES-MAC_BYTES) // mac will be appended by EncryptAead
 	p.ClientId = clientId
 	p.UserData = userData
 	p.ServerAddrs = serverAddrs
+	p.mac = make([]byte, MAC_BYTES)
+	return p
+}
+
+func NewEmptyConnectTokenPrivate() *ConnectTokenPrivate {
+	p := &ConnectTokenPrivate{}
+	p.TokenData = make([]byte, CONNECT_TOKEN_PRIVATE_BYTES)
 	p.mac = make([]byte, MAC_BYTES)
 	return p
 }
@@ -33,8 +41,10 @@ func (p *ConnectTokenPrivate) Generate() error {
 // Caller is expected to call Decrypt() and Read() to set the instances properties
 func NewConnectTokenPrivateEncrypted(buffer []byte) *ConnectTokenPrivate {
 	p := &ConnectTokenPrivate{}
+	p.TokenData = make([]byte, CONNECT_TOKEN_PRIVATE_BYTES) // need to allocate for mac
 	p.mac = make([]byte, MAC_BYTES)
-	copy(p.TokenData, buffer[:len(p.TokenData)])
+	copy(p.TokenData, buffer[:CONNECT_TOKEN_PRIVATE_BYTES])
+	copy(p.mac, buffer[CONNECT_TOKEN_PRIVATE_BYTES-MAC_BYTES:])
 	return p
 }
 
@@ -49,6 +59,7 @@ func (p *ConnectTokenPrivate) Mac() []byte {
 func (p *ConnectTokenPrivate) Read() error {
 	var err error
 	start := p.TokenData
+
 	if p.TokenData, err = ReadUint64(p.TokenData, &p.ClientId); err != nil {
 		return err
 	}
@@ -57,7 +68,7 @@ func (p *ConnectTokenPrivate) Read() error {
 		return err
 	}
 
-	if p.TokenData, err = ReadBytes(p.TokenData, &p.UserData, len(p.UserData)); err != nil {
+	if p.TokenData, err = ReadBytes(p.TokenData, &p.UserData, USER_DATA_BYTES); err != nil {
 		return errors.New("error reading user data")
 	}
 	p.TokenData = start
@@ -73,7 +84,7 @@ func (p *ConnectTokenPrivate) Write() ([]byte, error) {
 		return nil, err
 	}
 
-	if err := p.WriteShared(p.TokenData); err != nil {
+	if err := p.WriteShared(&p.TokenData); err != nil {
 		return nil, err
 	}
 
@@ -91,7 +102,6 @@ func (token *ConnectTokenPrivate) Encrypt(protocolId, expireTimestamp, sequence 
 	if err := EncryptAead(&token.TokenData, additionalData, nonce, privateKey); err != nil {
 		return err
 	}
-
 	if len(token.TokenData) != CONNECT_TOKEN_PRIVATE_BYTES {
 		return errors.New("invalid token private byte size")
 	}
@@ -105,7 +115,6 @@ func (token *ConnectTokenPrivate) Encrypt(protocolId, expireTimestamp, sequence 
 func (p *ConnectTokenPrivate) Decrypt(protocolId, expireTimestamp, sequence uint64, privateKey []byte) ([]byte, error) {
 	var err error
 
-	start := p.TokenData
 	if len(p.TokenData) != CONNECT_TOKEN_PRIVATE_BYTES {
 		return nil, errors.New("invalid token private byte size")
 	}
@@ -116,7 +125,6 @@ func (p *ConnectTokenPrivate) Decrypt(protocolId, expireTimestamp, sequence uint
 		return nil, err
 	}
 
-	p.TokenData = start // reset for reads
 	return p.TokenData, nil
 }
 

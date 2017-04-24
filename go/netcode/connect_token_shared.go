@@ -59,6 +59,7 @@ func (shared *sharedTokenData) ReadShared(buffer []byte) error {
 			if buffer, err = ReadBytes(buffer, &ipBytes, len(ipBytes)); err != nil {
 				return err
 			}
+
 		} else if serverType == ADDRESS_IPV6 {
 			ipBytes = make([]byte, 16)
 			for i := 0; i < 16; i += 2 {
@@ -82,24 +83,23 @@ func (shared *sharedTokenData) ReadShared(buffer []byte) error {
 		shared.ServerAddrs[i] = net.UDPAddr{IP: ip, Port: int(port)}
 	}
 
-	key := make([]byte, KEY_BYTES)
-	if buffer, err = ReadBytes(buffer, &key, KEY_BYTES); err != nil {
+	shared.ClientKey = make([]byte, KEY_BYTES)
+	if buffer, err = ReadBytes(buffer, &shared.ClientKey, KEY_BYTES); err != nil {
 		return err
 	}
-	copy(shared.ClientKey, key)
 
-	if buffer, err = ReadBytes(buffer, &key, KEY_BYTES); err != nil {
+	shared.ServerKey = make([]byte, KEY_BYTES)
+	if buffer, err = ReadBytes(buffer, &shared.ServerKey, KEY_BYTES); err != nil {
 		return err
 	}
-	copy(shared.ServerKey, key)
 	return nil
 }
 
 // Writes the servers and client <-> server keys to the supplied buffer
-func (shared *sharedTokenData) WriteShared(buffer []byte) error {
+func (shared *sharedTokenData) WriteShared(buffer *[]byte) error {
 
 	serverLen := uint32(len(shared.ServerAddrs))
-	buffer, _ = WriteUint32(buffer, serverLen)
+	*buffer, _ = WriteUint32(*buffer, serverLen)
 
 	for _, addr := range shared.ServerAddrs {
 		host, port, err := net.SplitHostPort(addr.String())
@@ -114,19 +114,19 @@ func (shared *sharedTokenData) WriteShared(buffer []byte) error {
 
 		parsedIpv4 := parsed.To4()
 		if parsedIpv4 != nil {
-			buffer, _ = WriteUint8(buffer, uint8(ADDRESS_IPV4))
+			*buffer, _ = WriteUint8(*buffer, uint8(ADDRESS_IPV4))
 
 			for i := 0; i < len(parsedIpv4); i += 1 {
-				buffer, _ = WriteUint8(buffer, parsedIpv4[i])
+				*buffer, _ = WriteUint8(*buffer, parsedIpv4[i])
 			}
 		} else {
-			buffer, _ = WriteUint8(buffer, uint8(ADDRESS_IPV6))
+			*buffer, _ = WriteUint8(*buffer, uint8(ADDRESS_IPV6))
 			for i := 0; i < len(parsed); i += 2 {
 				var n uint16
 				// net.IP is already big endian encoded, encode it to create little endian encoding.
 				n = uint16(parsed[i]) << 8
 				n = uint16(parsed[i+1])
-				buffer, _ = WriteUint16(buffer, n)
+				*buffer, _ = WriteUint16(*buffer, n)
 			}
 		}
 
@@ -135,10 +135,10 @@ func (shared *sharedTokenData) WriteShared(buffer []byte) error {
 			return err
 		}
 
-		buffer, _ = WriteUint16(buffer, uint16(p))
+		*buffer, _ = WriteUint16(*buffer, uint16(p))
 	}
 
-	buffer, _ = WriteBytesN(buffer, shared.ClientKey, KEY_BYTES)
-	buffer, _ = WriteBytesN(buffer, shared.ServerKey, KEY_BYTES)
+	*buffer, _ = WriteBytesN(*buffer, shared.ClientKey, KEY_BYTES)
+	*buffer, _ = WriteBytesN(*buffer, shared.ServerKey, KEY_BYTES)
 	return nil
 }

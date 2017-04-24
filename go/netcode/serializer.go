@@ -10,7 +10,7 @@ func ReadUint8(buf []byte, out *uint8) ([]byte, error) {
 	}
 
 	*out = uint8(buf[0])
-	return buf[SizeUint8:]
+	return buf[SizeUint8:], nil
 }
 
 func ReadUint16(buf []byte, out *uint16) ([]byte, error) {
