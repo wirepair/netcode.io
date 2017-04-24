@@ -128,7 +128,7 @@ func TestConnectionDeniedPacket(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error writing packet: %s\n", err)
 	}
-
+	t.Logf("bytes written: %d of %d\n", bytesWritten, MAX_PACKET_BYTES)
 	if bytesWritten <= 0 {
 		t.Fatalf("did not write any bytes for this packet")
 	}
@@ -140,7 +140,7 @@ func TestConnectionDeniedPacket(t *testing.T) {
 
 	outputPacket := &DeniedPacket{}
 
-	bufferCopy := make([]byte, bytesWritten)
+	bufferCopy := make([]byte, MAX_PACKET_BYTES)
 	copy(bufferCopy, start[:bytesWritten])
 
 	if err := outputPacket.Read(bufferCopy, bytesWritten, TEST_PROTOCOL_ID, uint64(time.Now().Unix()), packetKey, nil, allowedPackets, nil); err != nil {
@@ -164,6 +164,7 @@ func TestConnectionChallengePacket(t *testing.T) {
 	}
 
 	buffer := make([]byte, MAX_PACKET_BYTES)
+	start := buffer
 
 	packetKey, err := GenerateKey()
 	if err != nil {
@@ -186,8 +187,13 @@ func TestConnectionChallengePacket(t *testing.T) {
 	}
 
 	outputPacket := &ChallengePacket{}
-	//buffer.Reset()
-	if err := outputPacket.Read(buffer, bytesWritten, TEST_PROTOCOL_ID, uint64(time.Now().Unix()), packetKey, nil, allowedPackets, nil); err != nil {
+
+	bufferCopy := make([]byte, bytesWritten)
+	t.Logf("bytesWritten: %d\n", bytesWritten)
+	copy(bufferCopy, start[:bytesWritten])
+	t.Logf("buffercopy %#v\n", bufferCopy)
+
+	if err := outputPacket.Read(bufferCopy, bytesWritten, TEST_PROTOCOL_ID, uint64(time.Now().Unix()), packetKey, nil, allowedPackets, nil); err != nil {
 		t.Fatalf("error reading packet: %s\n", err)
 	}
 

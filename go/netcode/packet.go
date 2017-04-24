@@ -198,14 +198,15 @@ func (p *DeniedPacket) Sequence() uint64 {
 
 func (p *DeniedPacket) Write(buffer []byte, protocolId, sequence uint64, writePacketKey []byte) (int, error) {
 	start := buffer
-	prefixByte, err := writePacketPrefix(p, buffer, sequence)
+	prefixByte, err := writePacketPrefix(p, &buffer, sequence)
 	if err != nil {
 		return -1, err
 	}
-
 	// denied packets are empty
 	pos := len(start) - len(buffer)
-	return encryptPacket(buffer, pos, pos, prefixByte, protocolId, sequence, writePacketKey)
+	encryptLength, err := encryptPacket(buffer, pos, pos, prefixByte, protocolId, sequence, writePacketKey)
+	log.Printf("%#v\n", start[:encryptLength])
+	return encryptLength + pos, err
 }
 
 func (p *DeniedPacket) Read(packetBuffer []byte, packetLen int, protocolId, currentTimestamp uint64, readPacketKey, privateKey, allowedPackets []byte, replayProtection *ReplayProtection) error {
@@ -240,7 +241,7 @@ func (p *ChallengePacket) Sequence() uint64 {
 func (p *ChallengePacket) Write(buffer []byte, protocolId, sequence uint64, writePacketKey []byte) (int, error) {
 	start := buffer
 
-	prefixByte, err := writePacketPrefix(p, buffer, sequence)
+	prefixByte, err := writePacketPrefix(p, &buffer, sequence)
 	if err != nil {
 		return -1, err
 	}
@@ -248,8 +249,19 @@ func (p *ChallengePacket) Write(buffer []byte, protocolId, sequence uint64, writ
 	encryptedStart := len(start) - len(buffer)
 	buffer, _ = WriteUint64(buffer, p.ChallengeTokenSequence)
 	buffer, _ = WriteBytesN(buffer, p.ChallengeTokenData, CHALLENGE_TOKEN_BYTES)
-	encryptedFinish := encryptedStart - len(buffer)
-	return encryptPacket(buffer, encryptedStart, encryptedFinish, prefixByte, protocolId, sequence, writePacketKey)
+	encryptedFinish := len(start) - len(buffer)
+
+	encryptedBuf := buffer[encryptedStart:encryptedFinish]
+	additionalData, nonce := packetCryptData(prefixByte, protocolId, sequence)
+	if err := EncryptAead(&buffer[encryptedStart:encryptedFinish], additionalData, nonce, writePacketKey); err != nil {
+		return -1, err
+	}
+	buffer, _ = WriteBytes(start[encryptedStart:], encryptedBuf)
+	log.Printf("%p %d\n", &buffer, len(buffer)-len(encryptedBuf))
+
+	//encryptedLen, err := encryptPacket(buffer, encryptedStart, encryptedFinish, prefixByte, protocolId, sequence, writePacketKey)
+
+	return len(buffer) + encryptedStart, err
 }
 
 func (p *ChallengePacket) Read(packetBuffer []byte, packetLen int, protocolId, currentTimestamp uint64, readPacketKey, privateKey, allowedPackets []byte, replayProtection *ReplayProtection) error {
@@ -293,7 +305,7 @@ func (p *ResponsePacket) Sequence() uint64 {
 
 func (p *ResponsePacket) Write(buffer []byte, protocolId, sequence uint64, writePacketKey []byte) (int, error) {
 	start := buffer
-	prefixByte, err := writePacketPrefix(p, buffer, sequence)
+	prefixByte, err := writePacketPrefix(p, &buffer, sequence)
 	if err != nil {
 		return -1, err
 	}
@@ -301,7 +313,8 @@ func (p *ResponsePacket) Write(buffer []byte, protocolId, sequence uint64, write
 	encryptedStart := len(start) - len(buffer)
 	buffer, _ = WriteUint64(buffer, p.ChallengeTokenSequence)
 	buffer, _ = WriteBytesN(buffer, p.ChallengeTokenData, CHALLENGE_TOKEN_BYTES)
-	encryptedFinish := encryptedStart - len(buffer)
+	encryptedFinish := len(buffer) - encryptedStart
+	log.Printf("START %d, FINISH %d\n", encryptedStart, encryptedFinish)
 	return encryptPacket(buffer, encryptedStart, encryptedFinish, prefixByte, protocolId, sequence, writePacketKey)
 }
 
@@ -345,7 +358,7 @@ func (p *KeepAlivePacket) Sequence() uint64 {
 
 func (p *KeepAlivePacket) Write(buffer []byte, protocolId, sequence uint64, writePacketKey []byte) (int, error) {
 	start := buffer
-	prefixByte, err := writePacketPrefix(p, buffer, sequence)
+	prefixByte, err := writePacketPrefix(p, &buffer, sequence)
 	if err != nil {
 		return -1, err
 	}
@@ -353,7 +366,7 @@ func (p *KeepAlivePacket) Write(buffer []byte, protocolId, sequence uint64, writ
 	encryptedStart := len(start) - len(buffer)
 	buffer, _ = WriteUint32(buffer, uint32(p.ClientIndex))
 	buffer, _ = WriteUint32(buffer, uint32(p.MaxClients))
-	encryptedFinish := encryptedStart - len(buffer)
+	encryptedFinish := len(buffer) - encryptedStart
 	return encryptPacket(buffer, encryptedStart, encryptedFinish, prefixByte, protocolId, sequence, writePacketKey)
 }
 
@@ -409,13 +422,13 @@ func (p *PayloadPacket) Sequence() uint64 {
 
 func (p *PayloadPacket) Write(buffer []byte, protocolId, sequence uint64, writePacketKey []byte) (int, error) {
 	start := buffer
-	prefixByte, err := writePacketPrefix(p, buffer, sequence)
+	prefixByte, err := writePacketPrefix(p, &buffer, sequence)
 	if err != nil {
 		return -1, err
 	}
 	encryptedStart := len(start) - len(buffer)
 	buffer, _ = WriteBytesN(buffer, p.PayloadData, int(p.PayloadBytes))
-	encryptedFinish := encryptedStart - len(buffer)
+	encryptedFinish := len(buffer) - encryptedStart
 	return encryptPacket(buffer, encryptedStart, encryptedFinish, prefixByte, protocolId, sequence, writePacketKey)
 }
 
@@ -452,7 +465,7 @@ func (p *DisconnectPacket) Sequence() uint64 {
 
 func (p *DisconnectPacket) Write(buffer []byte, protocolId, sequence uint64, writePacketKey []byte) (int, error) {
 	start := buffer
-	prefixByte, err := writePacketPrefix(p, buffer, sequence)
+	prefixByte, err := writePacketPrefix(p, &buffer, sequence)
 	if err != nil {
 		return -1, err
 	}
@@ -485,6 +498,7 @@ func decryptPacket(packetBuffer *[]byte, packetLen int, protocolId, currentTimes
 	var prefixByte uint8
 	var err error
 
+	start := *packetBuffer
 	if *packetBuffer, err = ReadUint8(*packetBuffer, &prefixByte); err != nil {
 		return 0, nil, errors.New("invalid buffer length")
 	}
@@ -500,8 +514,7 @@ func decryptPacket(packetBuffer *[]byte, packetLen int, protocolId, currentTimes
 	// decrypt the per-packet type data
 	additionalData, nonce := packetCryptData(prefixByte, protocolId, packetSequence)
 
-	encryptedSize := packetLen - len(*packetBuffer)
-	log.Printf("%d = %d - %d\n", encryptedSize, packetLen, len(*packetBuffer))
+	encryptedSize := packetLen - (len(start) - len(*packetBuffer))
 	if encryptedSize < MAC_BYTES {
 		return 0, nil, errors.New("ignored encrypted packet. encrypted payload is too small")
 	}
@@ -510,7 +523,7 @@ func decryptPacket(packetBuffer *[]byte, packetLen int, protocolId, currentTimes
 	if *packetBuffer, err = ReadBytes(*packetBuffer, &encryptedBuf, encryptedSize); err != nil {
 		return 0, nil, errors.New("ignored encrypted packet. encrypted payload is too small")
 	}
-
+	//log.Printf("encryptedBuf: %#v\n", encryptedBuf)
 	decryptedBuf, err := DecryptAead(encryptedBuf, additionalData, nonce, readPacketKey)
 	if err != nil {
 		return 0, nil, errors.New("ignored encrypted packet. failed to decrypt: " + err.Error())
@@ -577,20 +590,20 @@ func validateSequence(packetLen int, prefixByte uint8, sequence uint64, readPack
 }
 
 // write the prefix byte (this is a combination of the packet type and number of sequence bytes)
-func writePacketPrefix(p Packet, buffer []byte, sequence uint64) (uint8, error) {
+func writePacketPrefix(p Packet, buffer *[]byte, sequence uint64) (uint8, error) {
 	sequenceBytes := sequenceNumberBytesRequired(sequence)
 	if sequenceBytes < 1 || sequenceBytes > 8 {
 		return 0, errors.New("invalid sequence bytes, must be between [1-8]")
 	}
 
 	prefixByte := uint8(p.GetType()) | uint8(sequenceBytes<<4)
-	buffer, _ = WriteUint8(buffer, prefixByte)
+	*buffer, _ = WriteUint8(*buffer, prefixByte)
 
 	sequenceTemp := sequence
 
 	var i uint8
 	for ; i < sequenceBytes; i += 1 {
-		buffer, _ = WriteUint8(buffer, uint8(sequenceTemp&0xFF))
+		*buffer, _ = WriteUint8(*buffer, uint8(sequenceTemp&0xFF))
 		sequenceTemp >>= 8
 	}
 	return prefixByte, nil
@@ -600,15 +613,13 @@ func writePacketPrefix(p Packet, buffer []byte, sequence uint64) (uint8, error) 
 func encryptPacket(buffer []byte, encryptedStart, encryptedFinish int, prefixByte uint8, protocolId, sequence uint64, writePacketKey []byte) (int, error) {
 	// slice up the buffer for the bits we will encrypt
 	encryptedBuffer := buffer[encryptedStart:encryptedFinish]
-
 	additionalData, nonce := packetCryptData(prefixByte, protocolId, sequence)
 	if err := EncryptAead(&encryptedBuffer, additionalData, nonce, writePacketKey); err != nil {
 		return -1, err
 	}
 
-	//buffer.Pos = encryptedStart // reset position to start of where the encrypted data goes
-	//buffer.WriteBytes(encryptedBuffer)
-	return len(buffer), nil // in c, we do Pos + MAC_BYTES but the WriteBytes will update buffer.Pos to include it
+	buffer, _ = WriteBytes(buffer, encryptedBuffer)
+	return len(encryptedBuffer), nil
 }
 
 // used for encrypting the per-packet packet written with the prefix byte, protocol id and version as the associated data. this must match to decrypt.
