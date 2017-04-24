@@ -210,7 +210,7 @@ func (p *DeniedPacket) Write(buffer []byte, protocolId, sequence uint64, writePa
 
 func (p *DeniedPacket) Read(packetBuffer []byte, packetLen int, protocolId, currentTimestamp uint64, readPacketKey, privateKey, allowedPackets []byte, replayProtection *ReplayProtection) error {
 	//start := packetBuffer
-	sequence, decryptedBuf, err := decryptPacket(packetBuffer, packetLen, protocolId, currentTimestamp, readPacketKey, allowedPackets, replayProtection)
+	sequence, decryptedBuf, err := decryptPacket(&packetBuffer, packetLen, protocolId, currentTimestamp, readPacketKey, allowedPackets, replayProtection)
 	if err != nil {
 		return err
 	}
@@ -254,7 +254,7 @@ func (p *ChallengePacket) Write(buffer []byte, protocolId, sequence uint64, writ
 
 func (p *ChallengePacket) Read(packetBuffer []byte, packetLen int, protocolId, currentTimestamp uint64, readPacketKey, privateKey, allowedPackets []byte, replayProtection *ReplayProtection) error {
 	//start := packetBuffer
-	sequence, decryptedBuf, err := decryptPacket(packetBuffer, packetLen, protocolId, currentTimestamp, readPacketKey, allowedPackets, replayProtection)
+	sequence, decryptedBuf, err := decryptPacket(&packetBuffer, packetLen, protocolId, currentTimestamp, readPacketKey, allowedPackets, replayProtection)
 	if err != nil {
 		return err
 	}
@@ -307,7 +307,7 @@ func (p *ResponsePacket) Write(buffer []byte, protocolId, sequence uint64, write
 
 func (p *ResponsePacket) Read(packetBuffer []byte, packetLen int, protocolId, currentTimestamp uint64, readPacketKey, privateKey, allowedPackets []byte, replayProtection *ReplayProtection) error {
 	//start := packetBuffer
-	sequence, decryptedBuf, err := decryptPacket(packetBuffer, packetLen, protocolId, currentTimestamp, readPacketKey, allowedPackets, replayProtection)
+	sequence, decryptedBuf, err := decryptPacket(&packetBuffer, packetLen, protocolId, currentTimestamp, readPacketKey, allowedPackets, replayProtection)
 	if err != nil {
 		return err
 	}
@@ -359,7 +359,7 @@ func (p *KeepAlivePacket) Write(buffer []byte, protocolId, sequence uint64, writ
 
 func (p *KeepAlivePacket) Read(packetBuffer []byte, packetLen int, protocolId, currentTimestamp uint64, readPacketKey, privateKey, allowedPackets []byte, replayProtection *ReplayProtection) error {
 	//start := packetBuffer
-	sequence, decryptedBuf, err := decryptPacket(packetBuffer, packetLen, protocolId, currentTimestamp, readPacketKey, allowedPackets, replayProtection)
+	sequence, decryptedBuf, err := decryptPacket(&packetBuffer, packetLen, protocolId, currentTimestamp, readPacketKey, allowedPackets, replayProtection)
 	if err != nil {
 		return err
 	}
@@ -421,7 +421,7 @@ func (p *PayloadPacket) Write(buffer []byte, protocolId, sequence uint64, writeP
 
 func (p *PayloadPacket) Read(packetBuffer []byte, packetLen int, protocolId, currentTimestamp uint64, readPacketKey, privateKey, allowedPackets []byte, replayProtection *ReplayProtection) error {
 	//start := packetBuffer
-	sequence, decryptedBuf, err := decryptPacket(packetBuffer, packetLen, protocolId, currentTimestamp, readPacketKey, allowedPackets, replayProtection)
+	sequence, decryptedBuf, err := decryptPacket(&packetBuffer, packetLen, protocolId, currentTimestamp, readPacketKey, allowedPackets, replayProtection)
 	if err != nil {
 		return err
 	}
@@ -463,7 +463,7 @@ func (p *DisconnectPacket) Write(buffer []byte, protocolId, sequence uint64, wri
 
 func (p *DisconnectPacket) Read(packetBuffer []byte, packetLen int, protocolId, currentTimestamp uint64, readPacketKey, privateKey, allowedPackets []byte, replayProtection *ReplayProtection) error {
 	//start := packetBuffer
-	sequence, decryptedBuf, err := decryptPacket(packetBuffer, packetLen, protocolId, currentTimestamp, readPacketKey, allowedPackets, replayProtection)
+	sequence, decryptedBuf, err := decryptPacket(&packetBuffer, packetLen, protocolId, currentTimestamp, readPacketKey, allowedPackets, replayProtection)
 	if err != nil {
 		return err
 	}
@@ -480,14 +480,12 @@ func (p *DisconnectPacket) GetType() PacketType {
 }
 
 // Decrypts the packet after reading in the prefix byte and sequence id. Used for all PacketTypes except RequestPacket. Returns a buffer containing the decrypted data
-func decryptPacket(packetBuffer []byte, packetLen int, protocolId, currentTimestamp uint64, readPacketKey, allowedPackets []byte, replayProtection *ReplayProtection) (uint64, []byte, error) {
+func decryptPacket(packetBuffer *[]byte, packetLen int, protocolId, currentTimestamp uint64, readPacketKey, allowedPackets []byte, replayProtection *ReplayProtection) (uint64, []byte, error) {
 	var packetSequence uint64
 	var prefixByte uint8
 	var err error
 
-	//start := packetBuffer
-
-	if packetBuffer, err = ReadUint8(packetBuffer, &prefixByte); err != nil {
+	if *packetBuffer, err = ReadUint8(*packetBuffer, &prefixByte); err != nil {
 		return 0, nil, errors.New("invalid buffer length")
 	}
 
@@ -502,13 +500,14 @@ func decryptPacket(packetBuffer []byte, packetLen int, protocolId, currentTimest
 	// decrypt the per-packet type data
 	additionalData, nonce := packetCryptData(prefixByte, protocolId, packetSequence)
 
-	encryptedSize := packetLen - len(packetBuffer)
+	encryptedSize := packetLen - len(*packetBuffer)
+	log.Printf("%d = %d - %d\n", encryptedSize, packetLen, len(*packetBuffer))
 	if encryptedSize < MAC_BYTES {
 		return 0, nil, errors.New("ignored encrypted packet. encrypted payload is too small")
 	}
 
 	encryptedBuf := make([]byte, encryptedSize)
-	if packetBuffer, err = ReadBytes(packetBuffer, &encryptedBuf, encryptedSize); err != nil {
+	if *packetBuffer, err = ReadBytes(*packetBuffer, &encryptedBuf, encryptedSize); err != nil {
 		return 0, nil, errors.New("ignored encrypted packet. encrypted payload is too small")
 	}
 
@@ -521,7 +520,7 @@ func decryptPacket(packetBuffer []byte, packetLen int, protocolId, currentTimest
 }
 
 // Reads and verifies the sequence id
-func readSequence(packetBuffer []byte, packetLen int, prefixByte uint8) (uint64, error) {
+func readSequence(packetBuffer *[]byte, packetLen int, prefixByte uint8) (uint64, error) {
 	var err error
 	var sequence uint64
 
@@ -538,7 +537,7 @@ func readSequence(packetBuffer []byte, packetLen int, prefixByte uint8) (uint64,
 	// read variable length sequence number [1,8]
 	for i = 0; i < sequenceBytes; i += 1 {
 		var val uint8
-		packetBuffer, err = ReadUint8(packetBuffer, &val)
+		*packetBuffer, err = ReadUint8(*packetBuffer, &val)
 		if err != nil {
 			return 0, err
 		}
